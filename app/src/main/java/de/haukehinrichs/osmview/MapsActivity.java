@@ -80,6 +80,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         };
         mMap.addTileOverlay(new TileOverlayOptions().tileProvider(tileProvider));
+        // hide actual maps so labels don't overlap
+        mMap.setMapType(GoogleMap.MAP_TYPE_NONE);
     }
 
 }
