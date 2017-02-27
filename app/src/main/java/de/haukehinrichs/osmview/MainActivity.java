@@ -4,6 +4,9 @@ import android.net.Uri;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.widget.DrawerLayout;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -13,12 +16,14 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
 import com.google.android.gms.maps.model.TileProvider;
 import com.google.android.gms.maps.model.UrlTileProvider;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Random;
 
 public class MainActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -26,6 +31,20 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private ListView mDrawerList;
     private GoogleMap mMap;
     private MapFragment mMapFragment;
+    private String[] mModes;
+    private TileOverlay mOverlay;
+    private int mMode = 0;
+    private String[] mUrls = {
+        "http://%s.tile.openstreetmap.org/%d/%d/%d.png",
+        "https://%s.tile.thunderforest.com/cycle/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+        "https://%s.tile.thunderforest.com/transport/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+        "https://%s.tile.thunderforest.com/landscape/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+        "https://%s.tile.thunderforest.com/outdoors/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+        "https://%s.tile.thunderforest.com/pioneer/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+        "https://%s.tile.thunderforest.com/mobile-atlas/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+        "https://%s.tile.thunderforest.com/neighbourhood/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2"
+    };
+    private final String[] mServers = {"a", "b", "c"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,7 +53,18 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         mMapFragment = MapFragment.newInstance();
         mMapFragment.getMapAsync(this);
         getFragmentManager().beginTransaction().add(R.id.content_frame, mMapFragment).commit();
+        mModes = getResources().getStringArray(R.array.map_modes_array);
+        mDrawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
+        mDrawerList = (ListView) findViewById(R.id.left_drawer);
+
+        // Set the adapter for the list view
+        mDrawerList.setAdapter(new ArrayAdapter<String>(this,
+                R.layout.drawer_list_item, mModes));
+        // Set the list's click listener
+        mDrawerList.setOnItemClickListener(new DrawerItemClickListener());
     }
+
+
 
 
     /**
@@ -49,13 +79,18 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-        TileProvider tileProvider = new UrlTileProvider(256, 256) {
+        mOverlay = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(getTileProvider()));
+        // hide actual maps so labels don't overlap
+        mMap.setMapType(GoogleMap.MAP_TYPE_NONE);
+    }
+
+    private UrlTileProvider getTileProvider() {
+        return new UrlTileProvider(256, 256) {
             @Override
             public URL getTileUrl(int x, int y, int zoom) {
 
-    /* Define the URL pattern for the tile images */
-                String s = String.format("http://a.tile.openstreetmap.org/%d/%d/%d.png",
-                        zoom, x, y);
+                /* Define the URL pattern for the tile images */
+                String s = String.format(mUrls[mMode], mServers[new Random().nextInt(3)],zoom, x, y);
 
                 if (!checkTileExists(x, y, zoom)) {
                     return null;
@@ -85,9 +120,14 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 return true;
             }
         };
-        mMap.addTileOverlay(new TileOverlayOptions().tileProvider(tileProvider));
-        // hide actual maps so labels don't overlap
-        mMap.setMapType(GoogleMap.MAP_TYPE_NONE);
+    }
+
+    private class DrawerItemClickListener implements ListView.OnItemClickListener {
+        @Override
+        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+            mMode = position;
+            mOverlay.clearTileCache();
+        }
     }
 
 }
