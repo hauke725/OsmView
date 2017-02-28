@@ -1,9 +1,15 @@
 package de.haukehinrichs.osmview;
 
-import android.net.Uri;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.widget.DrawerLayout;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -13,12 +19,11 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
-import com.google.android.gms.maps.model.TileProvider;
 import com.google.android.gms.maps.model.UrlTileProvider;
 
 import java.net.MalformedURLException;
@@ -27,6 +32,7 @@ import java.util.Random;
 
 public class MainActivity extends FragmentActivity implements OnMapReadyCallback {
 
+    private static final int PERMISSION_LOCATION = 935;
     private DrawerLayout mDrawerLayout;
     private ListView mDrawerList;
     private GoogleMap mMap;
@@ -35,16 +41,20 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private TileOverlay mOverlay;
     private int mMode = 0;
     private String[] mUrls = {
-        "http://%s.tile.openstreetmap.org/%d/%d/%d.png",
-        "https://%s.tile.thunderforest.com/cycle/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
-        "https://%s.tile.thunderforest.com/transport/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
-        "https://%s.tile.thunderforest.com/landscape/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
-        "https://%s.tile.thunderforest.com/outdoors/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
-        "https://%s.tile.thunderforest.com/pioneer/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
-        "https://%s.tile.thunderforest.com/mobile-atlas/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
-        "https://%s.tile.thunderforest.com/neighbourhood/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2"
+            "http://%s.tile.openstreetmap.org/%d/%d/%d.png",
+            "https://%s.tile.thunderforest.com/cycle/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+            "https://%s.tile.thunderforest.com/transport/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+            "https://%s.tile.thunderforest.com/landscape/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+            "https://%s.tile.thunderforest.com/outdoors/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+            "https://%s.tile.thunderforest.com/pioneer/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+            "https://%s.tile.thunderforest.com/mobile-atlas/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2",
+            "https://%s.tile.thunderforest.com/neighbourhood/%d/%d/%d.png?apikey=618a5839a59a4ef4adbea93e1f3a49e2"
     };
     private final String[] mServers = {"a", "b", "c"};
+    private View mFab;
+    private boolean trackLocation = false;
+    private Location mLastLocation;
+    private Marker mMarker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,10 +72,79 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 R.layout.drawer_list_item, mModes));
         // Set the list's click listener
         mDrawerList.setOnItemClickListener(new DrawerItemClickListener());
+        mFab = findViewById(R.id.track_location);
+        mFab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                trackLocation = true;
+                v.setVisibility(View.GONE);
+                if (mLastLocation != null) {
+                    zoomToLoaction(mLastLocation);
+                }
+            }
+        });
+        initLocationTracker();
     }
 
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
 
+    }
 
+    protected void initLocationTracker() {
+        // Acquire a reference to the system Location Manager
+        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+
+// Define a listener that responds to location updates
+        LocationListener locationListener = new LocationListener() {
+            public void onLocationChanged(Location location) {
+                Log.d("location", "location update");
+                if (!trackLocation) {
+                    Log.d("location", "not tracking");
+                    return;
+                }
+                if (location != mLastLocation) {
+                    Log.d("location", "changed, zooming ");
+                    mLastLocation = location;
+                    zoomToLoaction(location);
+                }
+            }
+
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+            }
+
+            public void onProviderEnabled(String provider) {
+            }
+
+            public void onProviderDisabled(String provider) {
+            }
+        };
+
+// Register the listener with the Location Manager to receive location updates
+
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSION_LOCATION);
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+        mLastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+    }
+
+    private void zoomToLoaction(Location location) {
+        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+        // Called when a new location is found by the network location provider.
+        if (mMarker != null) {
+            mMarker.remove();
+        }
+        mMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Location"));
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16), 1500, null);
+    }
 
     /**
      * Manipulates the map once available.
@@ -82,6 +161,16 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         mOverlay = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(getTileProvider()));
         // hide actual maps so labels don't overlap
         mMap.setMapType(GoogleMap.MAP_TYPE_NONE);
+        mMap.setOnCameraMoveStartedListener(new GoogleMap.OnCameraMoveStartedListener() {
+            @Override
+            public void onCameraMoveStarted(int reason) {
+                if (reason == REASON_GESTURE && trackLocation) {
+                    trackLocation = false;
+                    mFab.setVisibility(View.VISIBLE);
+                    mMarker.remove();
+                }
+            }
+        });
     }
 
     private UrlTileProvider getTileProvider() {
@@ -129,5 +218,4 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             mOverlay.clearTileCache();
         }
     }
-
 }
