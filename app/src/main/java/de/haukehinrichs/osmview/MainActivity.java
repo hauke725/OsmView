@@ -79,7 +79,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 trackLocation = true;
                 v.setVisibility(View.GONE);
                 if (mLastLocation != null) {
-                    zoomToLoaction(mLastLocation);
+                    updateLoaction(mLastLocation);
                 }
             }
         });
@@ -100,15 +100,8 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         LocationListener locationListener = new LocationListener() {
             public void onLocationChanged(Location location) {
                 Log.d("location", "location update");
-                if (!trackLocation) {
-                    Log.d("location", "not tracking");
-                    return;
-                }
-                if (location != mLastLocation) {
-                    Log.d("location", "changed, zooming ");
-                    mLastLocation = location;
-                    zoomToLoaction(location);
-                }
+                mLastLocation = location;
+                updateLoaction(location);
             }
 
             public void onStatusChanged(String provider, int status, Bundle extras) {
@@ -132,18 +125,20 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             // for ActivityCompat#requestPermissions for more details.
             return;
         }
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1500, 1, locationListener);
         mLastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
     }
 
-    private void zoomToLoaction(Location location) {
+    private void updateLoaction(Location location) {
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
         // Called when a new location is found by the network location provider.
         if (mMarker != null) {
             mMarker.remove();
         }
         mMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Location"));
-        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16), 1500, null);
+        if (trackLocation) {
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16), 1500, null);
+        }
     }
 
     /**
@@ -167,7 +162,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 if (reason == REASON_GESTURE && trackLocation) {
                     trackLocation = false;
                     mFab.setVisibility(View.VISIBLE);
-                    mMarker.remove();
                 }
             }
         });
@@ -214,8 +208,10 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private class DrawerItemClickListener implements ListView.OnItemClickListener {
         @Override
         public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+            //Log.d("style", String.format("changed map style: %d", position));
             mMode = position;
             mOverlay.clearTileCache();
+            mDrawerLayout.closeDrawers();
         }
     }
 }
