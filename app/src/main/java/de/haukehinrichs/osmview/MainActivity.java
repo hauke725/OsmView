@@ -14,11 +14,14 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.SearchView;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -55,6 +58,9 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private boolean trackLocation = false;
     private Location mLastLocation;
     private Marker mMarker;
+    private Marker mSearchMarker;
+    private SearchView mSearchView;
+    private SearchInputListener inputListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,10 +85,15 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 trackLocation = true;
                 v.setVisibility(View.GONE);
                 if (mLastLocation != null) {
-                    updateLoaction(mLastLocation);
+                    updateLocation(mLastLocation);
                 }
             }
         });
+        mSearchView = (SearchView) findViewById(R.id.search_input);
+        ListView suggestionView = (ListView) findViewById(R.id.search_suggestions);
+        inputListener = new SearchInputListener(getString(R.string.google_locations_key), suggestionView, this);
+        mSearchView.setOnSuggestionListener(inputListener);
+        mSearchView.setOnQueryTextListener(inputListener);
         initLocationTracker();
     }
 
@@ -101,7 +112,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             public void onLocationChanged(Location location) {
                 Log.d("location", "location update");
                 mLastLocation = location;
-                updateLoaction(location);
+                updateLocation(location);
             }
 
             public void onStatusChanged(String provider, int status, Bundle extras) {
@@ -129,16 +140,28 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         mLastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
     }
 
-    private void updateLoaction(Location location) {
+    private void updateLocation(Location location) {
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+        inputListener.updateLocation(latLng);
         // Called when a new location is found by the network location provider.
         if (mMarker != null) {
             mMarker.remove();
         }
-        mMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Location"));
+        BitmapDescriptor icon = BitmapDescriptorFactory.fromResource(R.drawable.marker_circle);
+        mMarker = mMap.addMarker(new MarkerOptions().position(latLng).title(getString(R.string.you_are_here)).icon(icon).anchor(.5f, .5f));
         if (trackLocation) {
             mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16), 1500, null);
         }
+    }
+
+    public void addMarker(LatLng latLng, String title) {
+        if (mSearchMarker != null) {
+            mSearchMarker.remove();
+        }
+        mSearchView.onActionViewCollapsed();
+        stopTrackingLocation();
+        mSearchMarker = mMap.addMarker(new MarkerOptions().position(latLng).title(title));
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16), 1500, null);
     }
 
     /**
@@ -160,11 +183,15 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onCameraMoveStarted(int reason) {
                 if (reason == REASON_GESTURE && trackLocation) {
-                    trackLocation = false;
-                    mFab.setVisibility(View.VISIBLE);
+                    stopTrackingLocation();
                 }
             }
         });
+    }
+
+    private void stopTrackingLocation() {
+        trackLocation = false;
+        mFab.setVisibility(View.VISIBLE);
     }
 
     private UrlTileProvider getTileProvider() {
